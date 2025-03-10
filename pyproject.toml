@@ -6,7 +6,7 @@ authors = ["olv-leo <olv.leo@outlook.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 streamlit = "^1.43.1"
 pandas = "^2.2.3"
 matplotlib = "^3.10.1"
