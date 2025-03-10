@@ -1,87 +1,165 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import plotly.express as px
-import folium
-from streamlit_folium import st_folium
-from urllib.parse import urlparse, parse_qs
 
-# Configuração da Página
-st.set_page_config(page_title="Dashboard Streamlit", layout="wide")
+# Sample data
+data = {
+    "topico": [1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3, 4],
+    "status": [
+        "Estudar",
+        "Revisar",
+        "Concluído",
+        "Estudar",
+        "Concluído",
+        "Revisar",
+        "Estudar",
+        "Concluído",
+        "Estudar",
+        "Revisar",
+        "Concluído",
+        "Estudar",
+    ],
+    "materia": [
+        "Matemática",
+        "Matemática",
+        "Matemática",
+        "Matemática",
+        "Matemática",
+        "Biologia",
+        "Biologia",
+        "Biologia",
+        "Matemática",
+        "Matemática",
+        "Matemática",
+        "Matemática",
+    ],
+    "nivel": [
+        "Básico",
+        "Básico",
+        "Básico",
+        "Básico",
+        "Básico",
+        "Básico",
+        "Básico",
+        "Básico",
+        "Avançado",
+        "Avançado",
+        "Avançado",
+        "Avançado",
+    ],
+    "confiança": [
+        "Baixa",
+        "Média",
+        "Alta",
+        "Baixa",
+        "Alta",
+        "Média",
+        "Baixa",
+        "Alta",
+        "Média",
+        "Alta",
+        "Baixa",
+        "Média",
+    ],
+    "dificuldade": [
+        "Fácil",
+        "Média",
+        "Difícil",
+        "Fácil",
+        "Difícil",
+        "Média",
+        "Fácil",
+        "Difícil",
+        "Média",
+        "Difícil",
+        "Fácil",
+        "Média",
+    ],
+}
 
-# Simulação de Dados para 20 usuários
-np.random.seed(42)
-usuarios = {}
-for i in range(1, 21):
-    usuarios[str(i)] = pd.DataFrame(
-        {
-            "Data": pd.date_range(start="2024-01-01", periods=100),
-            "Valor": np.random.randint(100, 500, 100),
-            "Categoria": np.random.choice(["A", "B", "C"], size=100),
-        }
-    )
-
-# Obter a Slug da URL
-query_params = st.query_params.to_dict()
-slug = query_params.get("slug", ["1"])[0]  # Padrão é 1 se não houver slug
-
-df = usuarios.get(slug, usuarios["1"])  # Se a slug não existir, usa usuário 1
-
-# Sidebar
-st.sidebar.title("Opções do Dashboard")
-st.sidebar.write(f"Usuário selecionado: {slug}")
-option = st.sidebar.radio("Escolha um gráfico:", ["Resumo", "Gráficos", "Mapa"])
+df = pd.DataFrame(data)
 
 
-# Seção 1: Resumo
-def show_summary():
-    st.title(f"Resumo dos Dados - Usuário {slug}")
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Total de Registros", df.shape[0])
-    col2.metric("Média dos Valores", f"R$ {df['Valor'].mean():.2f}")
-    col3.metric("Valor Máximo", f"R$ {df['Valor'].max():.2f}")
-
-    st.dataframe(df.head(10))
+def calcular_progresso(df, groupby_cols):
+    progresso = df.groupby(groupby_cols)["status"].value_counts().unstack(fill_value=0)
+    progresso["Total"] = progresso.sum(axis=1)
+    progresso["Concluído"] = progresso.get("Concluído", 0)
+    progresso["Percentual Concluído"] = (
+        (progresso["Concluído"] / progresso["Total"]) * 100
+    ).astype(int)
+    return progresso
 
 
-# Seção 2: Gráficos
-def show_charts():
-    st.title(f"Gráficos de Tendências - Usuário {slug}")
+st.title("Progresso das Matérias")
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    df.groupby("Data")["Valor"].sum().plot(ax=ax)
-    ax.set_title("Tendência de Valores ao Longo do Tempo")
-    ax.set_ylabel("Valor")
-    st.pyplot(fig)
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "home"
+    st.session_state.materia_selecionada = ""
+    st.session_state.nivel_selecionado = ""
 
-    st.subheader("Gráfico de Barras por Categoria")
-    fig_bar = px.bar(
-        df,
-        x="Categoria",
-        y="Valor",
-        color="Categoria",
-        title="Distribuição por Categoria",
-    )
-    st.plotly_chart(fig_bar)
+if st.session_state.pagina == "home":
+    progresso_df = calcular_progresso(df, ["materia"])
+    for materia, row in progresso_df.iterrows():
+        st.subheader(materia)
+        st.progress(row["Percentual Concluído"] / 100)
+        st.write(f"{row['Concluído']}/{row['Total']}")
+        if st.button(f"Ver detalhes - {materia}"):
+            st.session_state.pagina = "detalhes"
+            st.session_state.materia_selecionada = materia
+            st.rerun()
 
+elif st.session_state.pagina == "detalhes":
+    materia = st.session_state.materia_selecionada
+    st.subheader(f"Progresso detalhado - {materia}")
+    progresso_nivel_df = calcular_progresso(df[df["materia"] == materia], ["nivel"])
 
-# Seção 3: Mapa Interativo
-def show_map():
-    st.title(f"Mapa Interativo - Usuário {slug}")
+    for nivel, row in progresso_nivel_df.iterrows():
+        st.write(f"Nível: {nivel}")
+        st.progress(row["Percentual Concluído"] / 100)
+        st.write(f"{row['Concluído']}/{row['Total']}")
+        if st.button(f"Ver detalhes - {nivel}"):
+            st.session_state.nivel_selecionado = nivel
+            st.session_state[f"detalhes_{nivel}"] = not st.session_state.get(
+                f"detalhes_{nivel}", False
+            )
+            st.rerun()
 
-    mapa = folium.Map(location=[-23.5505, -46.6333], zoom_start=5)
-    folium.Marker([-23.5505, -46.6333], popup="São Paulo").add_to(mapa)
-    folium.Marker([-22.9068, -43.1729], popup="Rio de Janeiro").add_to(mapa)
+        if st.session_state.get(f"detalhes_{nivel}", False):
+            nivel_df = df[(df["materia"] == materia) & (df["nivel"] == nivel)]
 
-    st_folium(mapa, width=700, height=400)
+            # Injecting CSS to change progress bar color to yellow
+            st.markdown(
+                """
+                <style>
+                    .stProgress > div > div > div > div {
+                        background-color: yellow;
+                    }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 
+            st.write("### Distribuição de Status")
+            status_counts = nivel_df["status"].value_counts(normalize=True) * 100
+            for status, pct in status_counts.items():
+                st.write(f"{status}: {int(pct)}%")
+                st.progress(pct / 100)
 
-# Exibir a página selecionada
-if option == "Resumo":
-    show_summary()
-elif option == "Gráficos":
-    show_charts()
-elif option == "Mapa":
-    show_map()
+            st.write("### Distribuição de Confiança")
+            confianca_counts = nivel_df["confiança"].value_counts(normalize=True) * 100
+            for confianca, pct in confianca_counts.items():
+                st.write(f"{confianca}: {int(pct)}%")
+                st.progress(pct / 100)
+
+            st.write("### Distribuição de Dificuldade")
+            dificuldade_counts = (
+                nivel_df["dificuldade"].value_counts(normalize=True) * 100
+            )
+            for dificuldade, pct in dificuldade_counts.items():
+                st.write(f"{dificuldade}: {int(pct)}%")
+                st.progress(pct / 100)
+
+            st.table(nivel_df[["topico", "status", "confiança", "dificuldade"]])
+
+    if st.button("Voltar"):
+        st.session_state.pagina = "home"
+        st.rerun()
