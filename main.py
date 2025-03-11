@@ -7,12 +7,16 @@ import os
 from cryptography.fernet import Fernet
 import time
 import traceback
+from dotenv import load_dotenv
 
-# Configuração da página
+load_dotenv()
+
+CHAVE_FIXA = os.getenv("CHAVE_FIXA")
+CONCLUIDA = "CONCLUÍDA"
+REVISAR = "REVISAR"
+ESTUDAR = "ESTUDAR"
+
 st.set_page_config(page_title="Sistema de Progresso", page_icon="📊", layout="wide")
-
-# Configuração da chave de criptografia - em um ambiente real, deve ser armazenada de forma segura
-CHAVE_FIXA = "NvD4CGhJsO1xb9eXeMfmBW01Sxd6YpQZ"  # String fixa para criptografia
 
 try:
     chave = hashlib.sha256(CHAVE_FIXA.encode()).digest()
@@ -42,15 +46,14 @@ def descriptografar_email(valor_criptografado):
         return None
 
 
-# Função para conectar ao banco de dados
 def conectar_bd():
     try:
         with st.spinner("Conectando ao banco de dados..."):
             conn = psycopg2.connect(
-                dbname="",
-                user="",
-                password="",
-                host="",
+                dbname=os.getenv("DB_NAME"),
+                user=os.getenv("USER"),
+                password=os.getenv("PASSWORD"),
+                host=os.getenv("HOST"),
                 port="5432",
             )
             st.success("Conexão com banco de dados estabelecida!")
@@ -62,7 +65,6 @@ def conectar_bd():
         return None
 
 
-# Função para obter dados do usuário
 def obter_dados_usuario(email):
     st.info(f"Buscando dados para o usuário: {email}")
 
@@ -71,11 +73,48 @@ def obter_dados_usuario(email):
         try:
             with st.spinner("Processando consulta..."):
                 cursor = conn.cursor()
-                query = """
-                SELECT email_usuario, codigo_tarefa, descricao_tarefa, dificuldade, 
-                       entendimento, status, tipo_usuario
-                FROM tarefas
-                WHERE email_usuario = %s
+                query = f"""
+                WITH tarefas_usuarios AS (
+                    SELECT * FROM tarefas_usuarios
+                ),
+
+                usuario AS (
+                    SELECT * FROM usuarios WHERE email = %s
+                ),
+
+                mapa_materias AS (
+                    SELECT * FROM mapa_materias
+                ),
+
+                avaliacao_tarefas AS (
+                    SELECT 
+                        usuario.email AS email_usuario,
+                        tarefas.codigo_tarefa,
+                        mapa.codigo_nivel as nivel,
+                        mapa.materia,
+                        mapa.subgrupo AS descricao_tarefa,
+                        CASE WHEN tarefas.dificuldade IS NULL THEN 'SEM DADOS' ELSE
+                        CASE WHEN tarefas.dificuldade = 0 THEN 'FÁCIL' ELSE
+                        CASE WHEN tarefas.dificuldade = 1 THEN 'MÉDIO' ELSE 
+                        CASE WHEN tarefas.dificuldade = 2 THEN 'DIFÍCIL' END END END END AS dificuldade,
+                        CASE WHEN tarefas.entendimento IS NULL THEN 'SEM DADOS' ELSE
+                        CASE WHEN tarefas.entendimento = 0 THEN 'BAIXO' ELSE
+                        CASE WHEN tarefas.entendimento = 1 THEN 'MÉDIO' ELSE 
+                        CASE WHEN tarefas.entendimento = 2 THEN 'ALTO' END END END END AS entendimento,
+                        CASE 
+                            WHEN tarefas.flag_esta_concluida THEN '{CONCLUIDA}'
+                            WHEN tarefas.codigo_tarefa IS NULL THEN '{ESTUDAR}' 
+                            ELSE '{REVISAR}' 
+                        END AS status,
+                        usuario.tipo_usuario
+                    FROM mapa_materias mapa
+                    CROSS JOIN usuario 
+                    LEFT JOIN tarefas_usuarios tarefas 
+                        ON mapa.codigo_subgrupo = tarefas.codigo_subgrupo
+                )
+
+                SELECT * FROM avaliacao_tarefas
+
                 """
                 cursor.execute(query, (email,))
                 resultados = cursor.fetchall()
@@ -93,6 +132,8 @@ def obter_dados_usuario(email):
                     columns=[
                         "email_usuario",
                         "codigo_tarefa",
+                        "nivel",
+                        "materia",
                         "descricao_tarefa",
                         "dificuldade",
                         "entendimento",
@@ -108,8 +149,7 @@ def obter_dados_usuario(email):
                 df = df.rename(
                     columns={
                         "codigo_tarefa": "topico",
-                        "descricao_tarefa": "materia",
-                        "entendimento": "confiança",
+                        "entendimento": "confianca",
                     }
                 )
 
@@ -141,7 +181,7 @@ def calcular_progresso(df, groupby_cols):
             df.groupby(groupby_cols)["status"].value_counts().unstack(fill_value=0)
         )
         progresso["Total"] = progresso.sum(axis=1)
-        progresso["Concluído"] = progresso.get("Concluído", 0)
+        progresso["Concluído"] = progresso.get(CONCLUIDA, 0)
         progresso["Percentual Concluído"] = (
             (progresso["Concluído"] / progresso["Total"]) * 100
         ).astype(int)
@@ -218,7 +258,7 @@ def modo_desenvolvimento():
                     "Biologia",
                 ],
                 "nivel": ["Básico", "Básico", "Básico", "Avançado", "Avançado"],
-                "confiança": ["Baixa", "Média", "Alta", "Baixa", "Alta"],
+                "confianca": ["Baixa", "Média", "Alta", "Baixa", "Alta"],
                 "dificuldade": ["Fácil", "Média", "Difícil", "Fácil", "Difícil"],
             }
         )
@@ -417,7 +457,7 @@ if st.session_state.autenticado:
                                     st.write(
                                         f"{row['Concluído']}/{row['Total']} ({row['Percentual Concluído']}%)"
                                     )
-                                    if st.button(f"Ver detalhes - {materia}"):
+                                    if st.button(f"Detalhes de {materia}"):
                                         st.session_state.pagina = "detalhes"
                                         st.session_state.materia_selecionada = materia
                                         st.rerun()
@@ -499,7 +539,7 @@ if st.session_state.autenticado:
                                     with col2:
                                         st.write("### Distribuição de Confiança")
                                         confianca_counts = (
-                                            nivel_df["confiança"].value_counts(
+                                            nivel_df["confianca"].value_counts(
                                                 normalize=True
                                             )
                                             * 100
@@ -523,10 +563,12 @@ if st.session_state.autenticado:
                                     st.dataframe(
                                         nivel_df[
                                             [
-                                                "topico",
-                                                "status",
-                                                "confiança",
+                                                "nivel",
+                                                "materia",
+                                                "descricao_tarefa",
                                                 "dificuldade",
+                                                "confianca",
+                                                "status",
                                             ]
                                         ],
                                         use_container_width=True,
