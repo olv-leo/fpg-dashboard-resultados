@@ -235,48 +235,9 @@ def obter_email_da_url():
     return token
 
 
-# Função de modo de desenvolvimento para simular autenticação
-def modo_desenvolvimento():
-    st.sidebar.markdown("### Modo de Desenvolvimento")
-
-    # Opções para simular diferentes tipos de usuário
-    tipo_teste = st.sidebar.radio("Tipo de usuário para teste:", ["Free", "Premium"])
-
-    email_teste = st.sidebar.text_input("Email para teste:", "teste@exemplo.com")
-
-    if st.sidebar.button("Simular Login"):
-        # Criar um DataFrame de exemplo
-        df_exemplo = pd.DataFrame(
-            {
-                "topico": [1, 2, 3, 4, 5],
-                "status": ["Estudar", "Revisar", "Concluído", "Estudar", "Concluído"],
-                "materia": [
-                    "Matemática",
-                    "Matemática",
-                    "Matemática",
-                    "Biologia",
-                    "Biologia",
-                ],
-                "nivel": ["Básico", "Básico", "Básico", "Avançado", "Avançado"],
-                "confianca": ["Baixa", "Média", "Alta", "Baixa", "Alta"],
-                "dificuldade": ["Fácil", "Média", "Difícil", "Fácil", "Difícil"],
-            }
-        )
-
-        st.session_state.autenticado = True
-        st.session_state.email_usuario = email_teste
-        st.session_state.tipo_usuario = tipo_teste
-        st.session_state.df = df_exemplo
-        st.rerun()
-
-
 # Configuração inicial da interface
 def inicializar_interface():
     st.title("Progresso das Matérias")
-
-    # Verificar se o modo de desenvolvimento está ativado
-    if st.sidebar.checkbox("Ativar modo de desenvolvimento"):
-        modo_desenvolvimento()
 
     # Inicializar o estado da sessão
     if "pagina" not in st.session_state:
@@ -488,91 +449,75 @@ if st.session_state.autenticado:
                             "Não foi possível calcular o progresso por nível. Verifique se há dados suficientes."
                         )
                     else:
+                        # Aplicando CSS para a cor da barra de progresso
+                        st.markdown(
+                            """
+                            <style>
+                                .stProgress > div > div > div > div {
+                                    background-color: #0cb087;
+                                }
+                            </style>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
                         for nivel, row in progresso_nivel_df.iterrows():
                             with st.expander(
                                 f"Nível: {nivel} - {row['Percentual Concluído']}% concluído",
-                                expanded=True,
+                                expanded=False,
                             ):
                                 st.progress(row["Percentual Concluído"] / 100)
                                 st.write(f"{row['Concluído']}/{row['Total']}")
 
-                                # Usando checkbox ao invés de botão para evitar rerun desnecessário
-                                ver_detalhes = st.checkbox(
-                                    f"Ver detalhes do nível {nivel}",
-                                    key=f"check_{nivel}",
-                                    value=st.session_state.get(
-                                        f"detalhes_{nivel}", False
-                                    ),
-                                )
+                                nivel_df = materia_df[materia_df["nivel"] == nivel]
 
-                                st.session_state[f"detalhes_{nivel}"] = ver_detalhes
+                                col1, col2 = st.columns(2)
 
-                                if ver_detalhes:
-                                    nivel_df = materia_df[materia_df["nivel"] == nivel]
-
-                                    # Injecting CSS to change progress bar color
-                                    st.markdown(
-                                        """
-                                        <style>
-                                            .stProgress > div > div > div > div {
-                                                background-color: #0cb087;
-                                            }
-                                        </style>
-                                        """,
-                                        unsafe_allow_html=True,
+                                with col1:
+                                    st.write("### Distribuição de Status")
+                                    status_counts = (
+                                        nivel_df["status"].value_counts(normalize=True)
+                                        * 100
                                     )
+                                    for status, pct in status_counts.items():
+                                        st.write(f"{status}: {int(pct)}%")
+                                        st.progress(pct / 100)
 
-                                    col1, col2 = st.columns(2)
-
-                                    with col1:
-                                        st.write("### Distribuição de Status")
-                                        status_counts = (
-                                            nivel_df["status"].value_counts(
-                                                normalize=True
-                                            )
-                                            * 100
-                                        )
-                                        for status, pct in status_counts.items():
-                                            st.write(f"{status}: {int(pct)}%")
-                                            st.progress(pct / 100)
-
-                                    with col2:
-                                        st.write("### Distribuição de Confiança")
-                                        confianca_counts = (
-                                            nivel_df["confianca"].value_counts(
-                                                normalize=True
-                                            )
-                                            * 100
-                                        )
-                                        for confianca, pct in confianca_counts.items():
-                                            st.write(f"{confianca}: {int(pct)}%")
-                                            st.progress(pct / 100)
-
-                                    st.write("### Distribuição de Dificuldade")
-                                    dificuldade_counts = (
-                                        nivel_df["dificuldade"].value_counts(
+                                with col2:
+                                    st.write("### Distribuição de Confiança")
+                                    confianca_counts = (
+                                        nivel_df["confianca"].value_counts(
                                             normalize=True
                                         )
                                         * 100
                                     )
-                                    for dificuldade, pct in dificuldade_counts.items():
-                                        st.write(f"{dificuldade}: {int(pct)}%")
+                                    for confianca, pct in confianca_counts.items():
+                                        st.write(f"{confianca}: {int(pct)}%")
                                         st.progress(pct / 100)
 
-                                    st.subheader("Detalhe das tarefas")
-                                    st.dataframe(
-                                        nivel_df[
-                                            [
-                                                "nivel",
-                                                "materia",
-                                                "descricao_tarefa",
-                                                "dificuldade",
-                                                "confianca",
-                                                "status",
-                                            ]
-                                        ],
-                                        use_container_width=True,
-                                    )
+                                st.write("### Distribuição de Dificuldade")
+                                dificuldade_counts = (
+                                    nivel_df["dificuldade"].value_counts(normalize=True)
+                                    * 100
+                                )
+                                for dificuldade, pct in dificuldade_counts.items():
+                                    st.write(f"{dificuldade}: {int(pct)}%")
+                                    st.progress(pct / 100)
+
+                                st.subheader("Detalhe das tarefas")
+                                st.dataframe(
+                                    nivel_df[
+                                        [
+                                            "nivel",
+                                            "materia",
+                                            "descricao_tarefa",
+                                            "dificuldade",
+                                            "confianca",
+                                            "status",
+                                        ]
+                                    ],
+                                    use_container_width=True,
+                                )
             except Exception as e:
                 st.error(f"Erro ao exibir detalhes: {e}")
                 st.code(traceback.format_exc())
