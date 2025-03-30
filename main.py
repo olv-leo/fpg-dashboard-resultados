@@ -193,9 +193,6 @@ if not st.session_state.autenticado:
                 st.rerun()
     else:
         st.session_state.tentativa_auth = True
-        st.warning(
-            "Por favor, acesse através de um link válido com o parâmetro 'email'."
-        )
         st.markdown(
             "Em caso de problemas, envie um email para: suporte@fatecpragente.com.br"
         )
