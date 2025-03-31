@@ -11,7 +11,7 @@ CONCLUIDA = "CONCLUÍDA"
 REVISAR = "REVISAR"
 ESTUDAR = "ESTUDAR"
 
-st.set_page_config(page_title="Sistema de Progresso", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Progresso na Trilha", page_icon="📊", layout="wide")
 
 
 def conectar_bd():
@@ -202,133 +202,122 @@ if st.session_state.autenticado:
 
     # Botão para sair
     col1, col2, col3 = st.columns([1, 10, 1])
-    if st.session_state.tipo_usuario == "Free":
-        st.warning(
-            "Recurso exclusivo para membros Premium, adquira agora em [LINK](https://seu-link-premium.com)"
-        )
 
-    else:
-        try:
-            if st.session_state.pagina == "home":
-                if df.empty:
-                    st.warning("Nenhum dado disponível para exibição.")
-                else:
-                    try:
-                        progresso_df = calcular_progresso(df, ["materia"])
-                        if progresso_df.empty:
-                            st.warning(
-                                "Não foi possível calcular o progresso. Verifique se há dados suficientes."
-                            )
-                        else:
-                            col1, col2 = st.columns(2)
-                            materias = progresso_df.index.tolist()
-                            for i, materia in enumerate(materias):
-                                with col1 if i % 2 == 0 else col2:
-                                    row = progresso_df.loc[materia]
-                                    with st.container():
-                                        st.subheader(materia)
-                                        st.progress(row["Percentual Concluído"] / 100)
-                                        st.write(
-                                            f"{row['Concluído']}/{row['Total']} ({row['Percentual Concluído']}%)"
-                                        )
-                                        if st.button(f"Detalhes de {materia}"):
-                                            st.session_state.pagina = "detalhes"
-                                            st.session_state.materia_selecionada = (
-                                                materia
-                                            )
-                                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao exibir o progresso: {e}")
-            elif st.session_state.pagina == "detalhes":
-                materia = st.session_state.materia_selecionada
-                st.subheader(f"Progresso detalhado - {materia}")
-
-                if st.button("← Voltar para página inicial"):
-                    st.session_state.pagina = "home"
-                    st.rerun()
-
+    try:
+        if st.session_state.pagina == "home":
+            if df.empty:
+                st.warning("Nenhum dado disponível para exibição.")
+            else:
                 try:
-                    materia_df = df[df["materia"] == materia]
-                    if materia_df.empty:
-                        st.warning(f"Nenhum dado disponível para a matéria {materia}.")
+                    progresso_df = calcular_progresso(df, ["materia"])
+                    if progresso_df.empty:
+                        st.warning(
+                            "Não foi possível calcular o progresso. Verifique se há dados suficientes."
+                        )
                     else:
-                        progresso_nivel_df = calcular_progresso(materia_df, ["nivel"])
-                        if progresso_nivel_df.empty:
-                            st.warning(
-                                "Não foi possível calcular o progresso por nível. Verifique se há dados suficientes."
-                            )
-                        else:
-                            st.markdown(
-                                """
-                                <style>
-                                    .stProgress > div > div > div > div {
-                                        background-color: #0cb087;
-                                    }
-                                </style>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-                            for nivel, row in progresso_nivel_df.iterrows():
-                                with st.expander(
-                                    f"Nível: {nivel} - {row['Percentual Concluído']}% concluído",
-                                    expanded=False,
-                                ):
+                        col1, col2 = st.columns(2)
+                        materias = progresso_df.index.tolist()
+                        for i, materia in enumerate(materias):
+                            with col1 if i % 2 == 0 else col2:
+                                row = progresso_df.loc[materia]
+                                with st.container():
+                                    st.subheader(materia)
                                     st.progress(row["Percentual Concluído"] / 100)
-                                    st.write(f"{row['Concluído']}/{row['Total']}")
-                                    nivel_df = materia_df[materia_df["nivel"] == nivel]
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        st.write("### Distribuição de Status")
-                                        status_counts = (
-                                            nivel_df["status"].value_counts(
-                                                normalize=True
-                                            )
-                                            * 100
-                                        )
-                                        for status, pct in status_counts.items():
-                                            st.write(f"{status}: {int(pct)}%")
-                                            st.progress(pct / 100)
-                                    with col2:
-                                        st.write("### Distribuição de Confiança")
-                                        confianca_counts = (
-                                            nivel_df["confianca"].value_counts(
-                                                normalize=True
-                                            )
-                                            * 100
-                                        )
-                                        for confianca, pct in confianca_counts.items():
-                                            st.write(f"{confianca}: {int(pct)}%")
-                                            st.progress(pct / 100)
-                                    st.write("### Distribuição de Dificuldade")
-                                    dificuldade_counts = (
-                                        nivel_df["dificuldade"].value_counts(
+                                    st.write(
+                                        f"{row['Concluído']}/{row['Total']} ({row['Percentual Concluído']}%)"
+                                    )
+                                    if st.button(f"Detalhes de {materia}"):
+                                        st.session_state.pagina = "detalhes"
+                                        st.session_state.materia_selecionada = materia
+                                        st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao exibir o progresso: {e}")
+        elif st.session_state.pagina == "detalhes":
+            materia = st.session_state.materia_selecionada
+            st.subheader(f"Progresso detalhado - {materia}")
+
+            if st.button("← Voltar para página inicial"):
+                st.session_state.pagina = "home"
+                st.rerun()
+
+            try:
+                materia_df = df[df["materia"] == materia]
+                if materia_df.empty:
+                    st.warning(f"Nenhum dado disponível para a matéria {materia}.")
+                else:
+                    progresso_nivel_df = calcular_progresso(materia_df, ["nivel"])
+                    if progresso_nivel_df.empty:
+                        st.warning(
+                            "Não foi possível calcular o progresso por nível. Verifique se há dados suficientes."
+                        )
+                    else:
+                        st.markdown(
+                            """
+                            <style>
+                                .stProgress > div > div > div > div {
+                                    background-color: #0cb087;
+                                }
+                            </style>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        for nivel, row in progresso_nivel_df.iterrows():
+                            with st.expander(
+                                f"Nível: {nivel} - {row['Percentual Concluído']}% concluído",
+                                expanded=False,
+                            ):
+                                st.progress(row["Percentual Concluído"] / 100)
+                                st.write(f"{row['Concluído']}/{row['Total']}")
+                                nivel_df = materia_df[materia_df["nivel"] == nivel]
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.write("### Distribuição de Status")
+                                    status_counts = (
+                                        nivel_df["status"].value_counts(normalize=True)
+                                        * 100
+                                    )
+                                    for status, pct in status_counts.items():
+                                        st.write(f"{status}: {int(pct)}%")
+                                        st.progress(pct / 100)
+                                with col2:
+                                    st.write("### Distribuição de Confiança")
+                                    confianca_counts = (
+                                        nivel_df["confianca"].value_counts(
                                             normalize=True
                                         )
                                         * 100
                                     )
-                                    for dificuldade, pct in dificuldade_counts.items():
-                                        st.write(f"{dificuldade}: {int(pct)}%")
+                                    for confianca, pct in confianca_counts.items():
+                                        st.write(f"{confianca}: {int(pct)}%")
                                         st.progress(pct / 100)
-                                    st.subheader("Detalhe das tarefas")
-                                    st.dataframe(
-                                        nivel_df[
-                                            [
-                                                "nivel",
-                                                "materia",
-                                                "descricao_tarefa",
-                                                "dificuldade",
-                                                "confianca",
-                                                "status",
-                                            ]
-                                        ],
-                                        use_container_width=True,
-                                    )
-                except Exception as e:
-                    st.error(f"Erro ao exibir detalhes: {e}")
-        except Exception as e:
-            st.error(f"Erro inesperado no aplicativo: {e}")
-            st.warning("Ocorreu um erro inesperado. Tentando restaurar o aplicativo...")
-        if st.button("Reiniciar aplicativo"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+                                st.write("### Distribuição de Dificuldade")
+                                dificuldade_counts = (
+                                    nivel_df["dificuldade"].value_counts(normalize=True)
+                                    * 100
+                                )
+                                for dificuldade, pct in dificuldade_counts.items():
+                                    st.write(f"{dificuldade}: {int(pct)}%")
+                                    st.progress(pct / 100)
+                                st.subheader("Detalhe das tarefas")
+                                st.dataframe(
+                                    nivel_df[
+                                        [
+                                            "nivel",
+                                            "materia",
+                                            "descricao_tarefa",
+                                            "dificuldade",
+                                            "confianca",
+                                            "status",
+                                        ]
+                                    ],
+                                    use_container_width=True,
+                                )
+            except Exception as e:
+                st.error(f"Erro ao exibir detalhes: {e}")
+    except Exception as e:
+        st.error(f"Erro inesperado no aplicativo: {e}")
+        st.warning("Ocorreu um erro inesperado. Tentando restaurar o aplicativo...")
+    if st.button("Reiniciar aplicativo"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
